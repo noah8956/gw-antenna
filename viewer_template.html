@@ -1,0 +1,430 @@
+<title>Quartz Plate Topology Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: instrument-panel page. Control rail on top, two specimens drawn at a shared mm scale, readouts below, full atlas grid at the bottom. */
+:root {
+  --bg: #f3f5f6;
+  --panel: #ffffff;
+  --ink: #15202b;
+  --muted: #5d6b78;
+  --line: #d8dee3;
+  --accent: #2f45c9;
+  --solid: #1c2733;
+  --ghost: #c9d1d8;
+  --good: #1f7a4d;
+  --bad: #b23a2e;
+  --warn: #9a6a00;
+  --good-bg: #e3f2ea;
+  --bad-bg: #f7e3e0;
+  --warn-bg: #f6edd5;
+  --font-display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418; --panel: #151d23; --ink: #e4eaee; --muted: #93a1ad; --line: #26323b;
+    --accent: #8d9cff; --solid: #dfe6eb; --ghost: #33414c;
+    --good: #5cc98f; --bad: #f08a7c; --warn: #e2b54e;
+    --good-bg: #16302a; --bad-bg: #3a1f1c; --warn-bg: #352b14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418; --panel: #151d23; --ink: #e4eaee; --muted: #93a1ad; --line: #26323b;
+  --accent: #8d9cff; --solid: #dfe6eb; --ghost: #33414c;
+  --good: #5cc98f; --bad: #f08a7c; --warn: #e2b54e;
+  --good-bg: #16302a; --bad-bg: #3a1f1c; --warn-bg: #352b14;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.6rem, 3vw, 2.2rem); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.05rem; margin: 0 0 10px; }
+.lede { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: end; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.ctl { display: grid; gap: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 0.9rem; background: transparent; color: var(--ink); border: 0; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.seg button:focus-visible, input[type=range]:focus-visible, .thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.slider { flex: 1 1 280px; min-width: 0; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+
+.stage { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.specimen { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 8px; min-width: 0; }
+.spec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.spec-head .mono { font-size: 0.82rem; color: var(--muted); }
+canvas.plate { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); }
+.cbar { height: 8px; flex: 0 0 120px; border-radius: 2px; }
+
+.readouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.readout { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.readout .val { font-family: var(--font-mono); font-size: 1.6rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.readout .sub { font-size: 0.8rem; color: var(--muted); }
+.chip { justify-self: start; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.chip.good { color: var(--good); background: var(--good-bg); }
+.chip.bad { color: var(--bad); background: var(--bad-bg); }
+.chip.warn { color: var(--warn); background: var(--warn-bg); }
+
+.detail { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 500; color: var(--muted); font-size: 0.76rem; }
+td { font-family: var(--font-mono); }
+td:first-child { font-family: var(--font-body); }
+.tablewrap { overflow-x: auto; }
+.bars { display: grid; gap: 10px; }
+.bar-row { display: grid; gap: 3px; font-size: 0.82rem; }
+.bar-row .track { position: relative; height: 10px; background: var(--bg); border-radius: 3px; }
+.bar-row .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.bar-row .unity { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.bar-row .meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+.bar-row .meta .mono { color: var(--ink); }
+svg.spark { width: 100%; height: 140px; display: block; }
+.note { font-size: 0.85rem; color: var(--muted); margin: 8px 0 0; }
+.note.alert { color: var(--warn); }
+
+.atlas { display: grid; grid-template-columns: auto repeat(5, 1fr); gap: 8px; align-items: center; }
+.atlas .rowlab { font-size: 0.8rem; color: var(--muted); padding-right: 6px; white-space: nowrap; }
+.atlas .collab { text-align: center; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.thumb { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; cursor: pointer; display: grid; gap: 2px; justify-items: center; font: inherit; color: inherit; }
+.thumb[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.thumb canvas { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; }
+.thumb span { font-family: var(--font-mono); font-size: 0.72rem; }
+.foot { font-size: 0.8rem; color: var(--muted); max-width: 90ch; }
+
+@media (max-width: 860px) {
+  .stage, .detail { grid-template-columns: 1fr; }
+  .readouts { grid-template-columns: repeat(2, 1fr); }
+  .atlas { grid-template-columns: repeat(5, 1fr); }
+  .atlas .rowlab { grid-column: 1 / -1; padding-top: 6px; }
+  .atlas .corner, .atlas .collab { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="label">SC-cut quartz · 2D plane stress · SIMP p = 3 · target 5.000 MHz · equal volume</div>
+    <h1>Quartz Plate Topology Atlas</h1>
+    <p class="lede">Each design is a topology-optimized quartz plate, scaled so that its best-coupled mode sits at 5 MHz and thickened so that its volume equals the reference disk's. Pick an objective and a polarization, then slide through the volume fraction. Both plates are drawn at the same millimetre scale.</p>
+  </header>
+
+  <section class="controls" aria-label="Design selection">
+    <div class="ctl">
+      <span class="label" id="lab-obj">Objective</span>
+      <div class="seg" role="group" aria-labelledby="lab-obj" id="seg-obj">
+        <button type="button" data-v="energy">Energy per volume</button>
+        <button type="button" data-v="eta">η (brief's metric)</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span class="label" id="lab-pol">Polarization</span>
+      <div class="seg" role="group" aria-labelledby="lab-pol" id="seg-pol">
+        <button type="button" data-v="plus">+ (plus)</button>
+        <button type="button" data-v="cross">× (cross)</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span class="label" id="lab-view">Optimized plate shows</span>
+      <div class="seg" role="group" aria-labelledby="lab-view" id="seg-view">
+        <button type="button" data-v="mode">Mode shape</button>
+        <button type="button" data-v="geom">Geometry</button>
+      </div>
+    </div>
+    <div class="ctl slider">
+      <label class="label" for="vf">Volume fraction <span class="mono" id="vf-val"></span></label>
+      <input type="range" id="vf" min="0" max="4" step="1" value="2">
+      <div class="ticks" id="vf-ticks"></div>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div class="specimen">
+      <div class="spec-head"><h2 id="opt-title">Optimized plate</h2><span class="mono" id="opt-dims"></span></div>
+      <canvas class="plate" id="cv-opt" aria-label="Optimized plate drawing"></canvas>
+      <div class="legend" id="legend-opt"></div>
+    </div>
+    <div class="specimen">
+      <div class="spec-head"><h2>Reference disk</h2><span class="mono" id="disk-dims"></span></div>
+      <canvas class="plate" id="cv-disk" aria-label="Reference disk mode shape"></canvas>
+      <div class="legend"><span>|φ| (normalized to its maximum over solid material)</span><canvas class="cbar" id="cbar2" width="120" height="8"></canvas><span class="mono">0 → 1</span></div>
+    </div>
+  </section>
+
+  <section class="readouts" id="readouts" aria-label="Optimized versus disk"></section>
+
+  <section class="detail">
+    <div class="card">
+      <h2>Plate at 5 MHz</h2>
+      <div class="tablewrap"><table id="dims"></table></div>
+      <p class="note" id="flags"></p>
+    </div>
+    <div class="card">
+      <h2>Deposited energy, optimized ÷ disk</h2>
+      <div class="bars" id="bars"></div>
+      <p class="note">Literature waveform models. A ratio above 1 means the optimized plate takes more energy from the same wave.</p>
+    </div>
+    <div class="card">
+      <h2>Optimization history</h2>
+      <svg class="spark" id="spark" viewBox="0 0 320 140" preserveAspectRatio="none" role="img" aria-label="Objective versus iteration"></svg>
+      <p class="note" id="spark-note"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>All designs</h2>
+    <div class="atlas" id="atlas"></div>
+  </section>
+
+  <p class="foot">Model: 2D plane-stress Q4 FEM, free-free plate, IEEE-176 (YXwl) 22.4°/33.88° SC-cut stiffness, ρ = 2650 kg/m³. Tidal force f = ½ρ ḧ e·x with the wave along the plate normal. η is the brief's coupling, |∫φ·f dV| / (M ω² h), with φ normalized to max |φ| = 1. Γ/V is the deposited energy per unit volume and does not depend on how φ is normalized. χ is the fraction of the tidal pattern a mode captures. Ratios use the thresholded, largest connected component of each design. Thickness-shear modes, piezoelectricity and readout noise are not modeled.</p>
+</div>
+
+<script type="application/json" id="atlas-data">/*DATA*/</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById("atlas-data").textContent);
+  const RUNS = DATA.runs;
+  const VFS = DATA.volfracs;
+  const state = { obj: "energy", pol: "plus", vf: 2, view: "mode" };
+  try { const s = JSON.parse(localStorage.getItem("atlas-state") || "null"); if (s) Object.assign(state, s); } catch (e) {}
+
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const key = (o, p, v) => `${o}_${p}_vf${v}`;
+  const run = () => RUNS[key(state.obj, state.pol, VFS[state.vf])];
+
+  // Shared physical scale: the widest plate in the whole sweep fills the canvas.
+  let SCALE_MM = 0;
+  Object.values(RUNS).forEach(r => { SCALE_MM = Math.max(SCALE_MM, r.width_opt_mm, r.width_disk_mm); });
+  SCALE_MM *= 1.04;
+
+  // Perceptually ordered colormap (viridis stops)
+  const STOPS = [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+  function cmap(t) {
+    t = Math.max(0, Math.min(1, t)) * (STOPS.length - 1);
+    const i = Math.min(STOPS.length - 2, Math.floor(t)), f = t - i, a = STOPS[i], b = STOPS[i + 1];
+    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",")})`;
+  }
+  function drawCbar(cv) {
+    const g = cv.getContext("2d");
+    for (let x = 0; x < cv.width; x++) { g.fillStyle = cmap(x / (cv.width - 1)); g.fillRect(x, 0, 1, cv.height); }
+  }
+
+  function setupCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 300;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(w * dpr);
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return [g, w];
+  }
+
+  // Draw one plate. mode: "geom" | "mode". grid rows are y (row 0 = bottom).
+  function drawPlate(cv, r, which, mode, opts = {}) {
+    const [g, W] = setupCanvas(cv);
+    g.clearRect(0, 0, W, W);
+    const n = DATA.n;
+    const widthMM = which === "opt" ? r.width_opt_mm : r.width_disk_mm;
+    const pxPerMM = W / (opts.ownScale ? widthMM * 1.04 : SCALE_MM);
+    const side = widthMM * pxPerMM, x0 = (W - side) / 2, y0 = (W - side) / 2, cell = side / n;
+    // design-domain outline
+    g.strokeStyle = css("--line"); g.setLineDash([4, 4]); g.lineWidth = 1;
+    g.beginPath(); g.arc(W / 2, W / 2, side / 2, 0, 2 * Math.PI); g.stroke(); g.setLineDash([]);
+    const binary = which === "opt" ? r.binary : null;
+    const phi = which === "opt" ? r.phi_opt : r.phi_disk;
+    const dens = r.density;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const X = x0 + i * cell, Y = y0 + (n - 1 - j) * cell;
+      if (which === "opt" && mode === "geom") {
+        const b = binary[j][i], d = dens[j][i];
+        if (b > 0.5) { g.fillStyle = css("--solid"); g.fillRect(X, Y, cell + 0.5, cell + 0.5); }
+        else if (d > 0.15) { g.globalAlpha = Math.min(1, d); g.fillStyle = css("--ghost"); g.fillRect(X, Y, cell + 0.5, cell + 0.5); g.globalAlpha = 1; }
+      } else {
+        const v = phi[j][i];
+        if (v >= 0) { g.fillStyle = cmap(v); g.fillRect(X, Y, cell + 0.5, cell + 0.5); }
+      }
+    }
+    if (mode === "mode" && !opts.thumb) {
+      const arrows = which === "opt" ? r.arrows_opt : r.arrows_disk;
+      g.strokeStyle = "rgba(255,255,255,0.9)"; g.lineWidth = 1.1;
+      const L = side * 0.045;
+      arrows.forEach(([ax, ay, ux, uy]) => {
+        const px = x0 + ax * side, py = y0 + (1 - ay) * side;
+        const ex = px + ux * L, ey = py - uy * L;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(ex, ey); g.stroke();
+        const ang = Math.atan2(ey - py, ex - px), h = 2.5 * Math.hypot(ux, uy) + 0.8;
+        g.beginPath(); g.moveTo(ex, ey);
+        g.lineTo(ex - h * Math.cos(ang - 0.5), ey - h * Math.sin(ang - 0.5));
+        g.moveTo(ex, ey); g.lineTo(ex - h * Math.cos(ang + 0.5), ey - h * Math.sin(ang + 0.5)); g.stroke();
+      });
+    }
+    if (!opts.thumb) {
+      // scale bar: 0.2 mm
+      const barMM = SCALE_MM > 1.2 ? 0.5 : 0.2, bw = barMM * pxPerMM;
+      g.fillStyle = css("--ink"); g.fillRect(12, W - 16, bw, 2);
+      g.font = `500 11px ${css("--font-mono")}`; g.fillText(`${barMM} mm`, 12, W - 22);
+    }
+  }
+
+  const fmt = (x, d = 2) => (x == null || !isFinite(x)) ? "–" : Number(x).toFixed(d);
+  const fmtE = (x) => Number(x).toExponential(2);
+  function chip(r) {
+    if (r > 1.05) return `<span class="chip good">beats disk</span>`;
+    if (r < 0.95) return `<span class="chip bad">worse than disk</span>`;
+    return `<span class="chip warn">within 5%</span>`;
+  }
+
+  function renderReadouts(r) {
+    const s = r.summary, o = r.designs["optimized (binary, connected)"];
+    const dk = r.designs[state.obj === "eta" ? "disk, best-eta mode" : "disk, best-energy mode"];
+    const items = [
+      ["Energy per volume Γ/V", s.energy_per_volume_ratio, `${fmtE(o.Gamma_per_volume_kg_per_m)} vs ${fmtE(dk.Gamma_per_volume_kg_per_m)} kg/m`],
+      ["Coupling η (brief's metric)", s.eta_ratio, `${fmt(o.eta_m * 1e6, 1)} vs ${fmt(dk.eta_m * 1e6, 1)} µm`],
+      ["Tidal capture χ", o.chi / dk.chi, `${fmt(o.chi, 3)} vs ${fmt(dk.chi, 3)}`],
+      ["Sky-averaged energy", s.sky_avg_energy_per_volume_ratio, "isotropic sources, random polarization"],
+    ];
+    document.getElementById("readouts").innerHTML = items.map(([lab, v, sub]) =>
+      `<div class="readout"><span class="label">${lab}</span><span class="val">${fmt(v, 2)}×</span>${chip(v)}<span class="sub">${sub}</span></div>`).join("");
+  }
+
+  function renderDims(r) {
+    const o = r.designs["optimized (binary, connected)"];
+    const dk = r.designs[state.obj === "eta" ? "disk, best-eta mode" : "disk, best-energy mode"];
+    const row = (lab, a, b, d) => `<tr><td>${lab}</td><td>${a}</td><td>${b}</td></tr>`;
+    document.getElementById("dims").innerHTML =
+      `<tr><th></th><th>optimized</th><th>disk</th></tr>` +
+      row("Lateral width [mm]", fmt(o.width_mm, 3), fmt(dk.width_mm, 3)) +
+      row("Thickness [mm]", fmt(o.thickness_mm, 3), fmt(dk.thickness_mm, 3)) +
+      row("Thickness / width", fmt(o.t_over_w, 2), fmt(dk.t_over_w, 2)) +
+      row("Volume [mm³]", fmtE(o.volume_mm3), fmtE(dk.volume_mm3)) +
+      row(`η other polarization [µm]`, fmt(o.eta_other_pol_m * 1e6, 1), fmt(dk.eta_other_pol_m * 1e6, 1)) +
+      row("Modal mass [µg]", fmt(o.Mn_kg * 1e9, 2), fmt(dk.Mn_kg * 1e9, 2));
+    const s = r.summary, flags = [];
+    if (o.t_over_w > 0.3) flags.push(`Thickness/width is ${fmt(o.t_over_w, 2)}, which strains the thin-plate (plane-stress) assumption.`);
+    if (s.n_solid_components_before_cleanup > 1) flags.push(`${s.n_solid_components_before_cleanup - 1} floating island(s) were removed before evaluation.`);
+    const gap = Math.abs(Math.log((s.eta_ratio_gray || 1e-9) / s.eta_ratio));
+    if (gap > Math.log(1.5)) flags.push(`The gray design's η ratio (${fmt(s.eta_ratio_gray, 2)}×) differs from the binary design's. The optimizer exploited intermediate densities.`);
+    if (state.obj === "eta" && s.eta_ratio > 1.05 && s.energy_per_volume_ratio < 0.95) flags.push("The η gain comes with an energy loss, so φ's max-normalization is being gamed (a light, whipping appendage).");
+    const el = document.getElementById("flags");
+    el.textContent = flags.length ? flags.join(" ") : `Minimum feature about ${fmt(s.min_feature_um, 0)} µm, ${s.iterations} iterations, binary volume fraction ${fmt(s.final_volfrac_binary, 2)}.`;
+    el.className = "note" + (flags.length ? " alert" : "");
+  }
+
+  function renderBars(r) {
+    const ws = r.summary.waveforms;
+    const maxv = Math.max(2, ...ws.map(w => w.E_ratio)) * 1.05;
+    const short = (n) => n.replace(/\s*\(.*?\)\s*/g, " ").replace(/,.*$/, "").trim();
+    document.getElementById("bars").innerHTML = ws.map(w => {
+      const v = w.E_ratio, col = v > 1.05 ? css("--good") : v < 0.95 ? css("--bad") : css("--warn");
+      return `<div class="bar-row"><div class="meta"><span>${short(w.waveform)}</span><span class="mono">${fmt(v, 2)}×</span></div>
+        <div class="track"><div class="fill" style="width:${Math.min(100, 100 * v / maxv)}%;background:${col}"></div>
+        <div class="unity" style="left:${100 / maxv}%"></div></div>
+        <div class="meta"><span>peak h ${Number(w.peak_strain).toExponential(1)}</span><span>E/kT opt ${Number(w.SNR_opt).toExponential(1)}</span></div></div>`;
+    }).join("");
+  }
+
+  function renderSpark(r) {
+    const h = r.history, svg = document.getElementById("spark");
+    const W = 320, H = 140, P = { l: 30, r: 8, t: 8, b: 18 };
+    const vals = h.map(d => d.J);
+    const lo = 0, hi = Math.max(1.2, Math.min(4, Math.max(...vals))) * 1.05;
+    const x = (i) => P.l + (W - P.l - P.r) * i / Math.max(1, h.length - 1);
+    const y = (v) => P.t + (H - P.t - P.b) * (1 - (Math.min(v, hi) - lo) / (hi - lo));
+    const path = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    const ticks = [0, 1, hi > 2.2 ? 2 : null, hi > 3.2 ? 3 : null].filter(t => t != null);
+    // stage boundaries
+    const stages = []; h.forEach((d, i) => { if (i && d.beta !== h[i - 1].beta) stages.push(i); });
+    svg.innerHTML =
+      ticks.map(t => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="${css("--line")}" stroke-width="1" ${t === 1 ? 'stroke-dasharray="4 3"' : ""}/>
+        <text x="${P.l - 6}" y="${y(t) + 4}" text-anchor="end" font-size="10" fill="${css("--muted")}" font-family="${css("--font-mono")}">${t}</text>`).join("") +
+      stages.map(i => `<line x1="${x(i)}" x2="${x(i)}" y1="${P.t}" y2="${H - P.b}" stroke="${css("--line")}" stroke-width="1"/>`).join("") +
+      `<path d="${path}" fill="none" stroke="${css("--accent")}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+       <circle cx="${x(vals.length - 1)}" cy="${y(vals[vals.length - 1])}" r="3" fill="${css("--accent")}"/>
+       <text x="${W - P.r}" y="${H - 4}" text-anchor="end" font-size="10" fill="${css("--muted")}" font-family="${css("--font-mono")}">iteration ${h.length}</text>`;
+    document.getElementById("spark-note").textContent =
+      `Objective relative to the starting disk (dashed line = 1). Vertical lines mark projection-sharpness (β) steps. Final value ${fmt(vals[vals.length - 1], 2)}×, measured on the gray design during optimization.`;
+  }
+
+  function buildAtlas() {
+    const el = document.getElementById("atlas");
+    const rows = [["energy", "plus", "Energy · +"], ["energy", "cross", "Energy · ×"], ["eta", "plus", "η · +"], ["eta", "cross", "η · ×"]];
+    let html = `<span class="corner"></span>` + VFS.map(v => `<span class="collab">vf ${v}</span>`).join("");
+    rows.forEach(([o, p, lab]) => {
+      html += `<span class="rowlab">${lab}</span>`;
+      VFS.forEach((v, vi) => {
+        const r = RUNS[key(o, p, v)];
+        html += r ? `<button type="button" class="thumb" data-o="${o}" data-p="${p}" data-v="${vi}" aria-label="${lab}, volume fraction ${v}">
+            <canvas data-k="${key(o, p, v)}"></canvas><span>${fmt(r.summary.energy_per_volume_ratio, 2)}× E</span></button>`
+          : `<span></span>`;
+      });
+    });
+    el.innerHTML = html;
+    el.querySelectorAll(".thumb").forEach(b => b.addEventListener("click", () => {
+      state.obj = b.dataset.o; state.pol = b.dataset.p; state.vf = +b.dataset.v; render();
+      document.querySelector(".controls").scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+  }
+  function drawAtlas() {
+    document.querySelectorAll("#atlas canvas").forEach(cv => {
+      const r = RUNS[cv.dataset.k];
+      drawPlate(cv, r, "opt", "geom", { thumb: true, ownScale: true });
+    });
+    document.querySelectorAll("#atlas .thumb").forEach(b => {
+      b.setAttribute("aria-current", String(b.dataset.o === state.obj && b.dataset.p === state.pol && +b.dataset.v === state.vf));
+    });
+  }
+
+  function syncControls() {
+    [["seg-obj", "obj"], ["seg-pol", "pol"], ["seg-view", "view"]].forEach(([id, k]) =>
+      document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === state[k]))));
+    document.getElementById("vf").value = state.vf;
+    document.getElementById("vf-val").textContent = VFS[state.vf];
+  }
+
+  function render() {
+    syncControls();
+    try { localStorage.setItem("atlas-state", JSON.stringify(state)); } catch (e) {}
+    const r = run();
+    if (!r) return;
+    const o = r.designs["optimized (binary, connected)"];
+    document.getElementById("opt-title").textContent = `Optimized plate · ${state.obj === "eta" ? "η" : "energy"} objective · ${state.pol === "plus" ? "+" : "×"}`;
+    document.getElementById("opt-dims").textContent = `${fmt(r.width_opt_mm, 3)} mm domain`;
+    document.getElementById("disk-dims").textContent = `${fmt(r.width_disk_mm, 3)} mm`;
+    drawPlate(document.getElementById("cv-opt"), r, "opt", state.view);
+    drawPlate(document.getElementById("cv-disk"), r, "disk", "mode");
+    const lg = document.getElementById("legend-opt");
+    lg.innerHTML = state.view === "mode"
+      ? `<span>|φ| on solid material</span><canvas class="cbar" id="cbar1" width="120" height="8"></canvas><span class="mono">0 → 1</span>`
+      : `<span>Solid (thresholded, connected). Faint cells are removed gray density.</span>`;
+    const c1 = document.getElementById("cbar1"); if (c1) drawCbar(c1);
+    renderReadouts(r); renderDims(r); renderBars(r); renderSpark(r); drawAtlas();
+  }
+
+  [["seg-obj", "obj"], ["seg-pol", "pol"], ["seg-view", "view"]].forEach(([id, k]) =>
+    document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener("click", () => { state[k] = b.dataset.v; render(); })));
+  document.getElementById("vf").addEventListener("input", (e) => { state.vf = +e.target.value; render(); });
+  document.getElementById("vf").max = VFS.length - 1;
+  document.getElementById("vf-ticks").innerHTML = VFS.map(v => `<span>${v}</span>`).join("");
+  drawCbar(document.getElementById("cbar2"));
+  buildAtlas();
+  render();
+  let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 120); });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

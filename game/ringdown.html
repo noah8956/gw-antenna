@@ -1,0 +1,684 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ringdown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet. HUD strip on top, square quartz grid in the middle, tuning meters and tools below. Single dark look by choice. */
+:root {
+  --space: #0c0a1d;        /* deep violet-black sky */
+  --space-2: #17142f;      /* panels */
+  --line: #2c2752;         /* hairlines, disk outline */
+  --quartz: #bfe6ff;       /* crystal */
+  --quartz-dim: #5b6f8f;   /* floating islands, idle text */
+  --wave: #ffb44d;         /* incoming gravitational wave, tidal pull */
+  --gold: #ffe27a;         /* golden merger */
+  --noise: #ff5c86;        /* thermal noise floor, strikes */
+  --text: #e9e6ff;
+  --muted: #8f89b8;
+  --display: "Chakra Petch", "Avenir Next Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--space); color: var(--text); font-family: var(--mono); font-size: 13px;
+  overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+#sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+#app {
+  position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; gap: 8px;
+  max-width: 620px; margin: 0 auto; box-sizing: border-box;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.hud { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: .18em; color: var(--quartz); }
+.stats { display: flex; gap: 14px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.stat b { font-family: var(--display); font-size: 17px; color: var(--text); font-weight: 700; }
+.stat span { color: var(--muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; margin-right: 4px; }
+.combo.hot b { color: var(--gold); text-shadow: 0 0 10px var(--gold); }
+.strikes { display: flex; gap: 4px; }
+.strikes i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--noise); display: inline-block; }
+.strikes i.on { background: var(--noise); }
+
+.card { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.glyph { width: 40px; height: 40px; flex: none; }
+.card-text { min-width: 0; flex: 1; }
+.card-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--wave); letter-spacing: .04em; }
+.card-title.gold { color: var(--gold); }
+.card-sub { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer { font-family: var(--display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); min-width: 2.2em; text-align: right; }
+
+#stageWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+#stage { display: block; touch-action: none; }
+.toast {
+  position: absolute; left: 50%; top: 4px; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: .08em; text-align: center;
+  text-shadow: 0 0 4px var(--space), 0 0 18px currentColor; opacity: 0; transition: opacity .2s;
+}
+.toast small { display: block; font-family: var(--mono); font-size: 13px; font-weight: 400; letter-spacing: 0; text-shadow: none; color: var(--text); margin-top: 4px; }
+.tip { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; color: var(--text); font-size: 12px; pointer-events: none; text-shadow: 0 1px 6px var(--space); }
+
+.meters { display: grid; gap: 6px; }
+.meter { display: grid; grid-template-columns: 58px 1fr 100px; align-items: center; gap: 8px; }
+.meter label { color: var(--muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.meter output { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+.bar { position: relative; height: 14px; background: var(--space-2); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.bar .band { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--wave) 45%, transparent); }
+.bar .needle { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: var(--quartz); box-shadow: 0 0 8px var(--quartz); }
+.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--quartz-dim), var(--quartz)); }
+.bar .floor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--noise); box-shadow: 0 0 6px var(--noise); }
+.bar .ticks { position: absolute; inset: 0; display: flex; justify-content: space-between; padding: 0 2px; font-size: 8px; color: var(--muted); align-items: center; pointer-events: none; }
+
+.tools { display: flex; gap: 5px; flex-wrap: wrap; }
+button {
+  font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; color: var(--text);
+  background: var(--space-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 38px;
+}
+button:focus-visible { outline: 2px solid var(--quartz); outline-offset: 2px; }
+button[aria-pressed="true"] { border-color: var(--quartz); color: var(--quartz); }
+button.go { margin-left: auto; background: var(--wave); color: var(--space); border-color: var(--wave); padding-inline: 16px; }
+button:disabled { opacity: .4; cursor: default; }
+button.pad { min-width: 52px; font-size: 16px; touch-action: none; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px; margin: 0 2px; opacity: .8; }
+.keys { color: var(--quartz); }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--space) 86%, transparent); backdrop-filter: blur(4px); overflow-y: auto;
+  padding-block: 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.panel { max-width: 460px; width: 100%; display: grid; gap: 14px; margin: auto; }
+.panel h1 { font-family: var(--display); font-size: clamp(40px, 12vw, 64px); letter-spacing: .14em; margin: 0; color: var(--quartz); text-shadow: 0 0 28px color-mix(in srgb, var(--quartz) 50%, transparent); line-height: 1; }
+.panel h2 { font-family: var(--display); font-size: 30px; margin: 0; color: var(--noise); letter-spacing: .08em; }
+.panel p { margin: 0; line-height: 1.55; color: var(--text); max-width: 62ch; }
+.panel p.muted { color: var(--muted); font-size: 12px; }
+.legend { display: grid; gap: 8px; }
+.legend div { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; line-height: 1.45; }
+.legend i { width: 12px; height: 12px; border-radius: 2px; margin-top: 3px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.check { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
+.check input { accent-color: var(--wave); width: 18px; height: 18px; }
+#shareImg { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+.shareText { font-size: 12px; white-space: pre-wrap; background: var(--space-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px; user-select: text; -webkit-user-select: text; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div id="app">
+  <div class="hud">
+    <div class="brand">RINGDOWN</div>
+    <div class="stats">
+      <div class="stat"><span>Wave</span><b id="waveNo">1</b></div>
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat combo"><span>Combo</span><b id="combo">×1</b></div>
+      <div class="stat strikes" id="strikes" title="Waves lost in noise"><i></i><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <canvas class="glyph" id="glyph" width="80" height="80" aria-hidden="true"></canvas>
+    <div class="card-text">
+      <div class="card-title" id="waveName">Sine-Gaussian burst</div>
+      <div class="card-sub" id="waveSub">5.0 MHz · + polarization · 1 kpc</div>
+    </div>
+    <div class="timer" id="timer">10</div>
+  </div>
+
+  <div id="stageWrap">
+    <canvas id="stage" aria-label="Quartz plate antenna. Arrow keys turn and tune it."></canvas>
+    <div class="toast" id="toast"></div>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="meters">
+    <div class="meter">
+      <label>Tuning</label>
+      <div class="bar" id="tuneBar"><div class="band" id="band"></div><div class="needle" id="needle"></div>
+        <div class="ticks"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
+      <output id="fOut">5.00 MHz</output>
+    </div>
+    <div class="meter">
+      <label>Catch</label>
+      <div class="bar"><div class="fill" id="catchFill"></div><div class="floor" id="floorLine"></div></div>
+      <output id="catchOut">0.00</output>
+    </div>
+    <div class="meter">
+      <label>Aim</label>
+      <div class="bar"><div class="fill" id="aimFill"></div></div>
+      <output id="aimOut">+</output>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button id="kLeft" class="pad" aria-label="Turn left" title="Turn left (←)">◀</button>
+    <button id="kRight" class="pad" aria-label="Turn right" title="Turn right (→)">▶</button>
+    <button id="kDown" class="pad" aria-label="Tune higher" title="Tune higher (↓)">▼</button>
+    <button id="kUp" class="pad" aria-label="Tune lower" title="Tune lower (↑)">▲</button>
+    <button id="bMute" aria-pressed="false" title="Sound on or off">♪</button>
+    <button id="bGo" class="go" title="Let the wave hit now (Space)">Ring it</button>
+  </div>
+</div>
+
+<div class="overlay" id="title">
+  <div class="panel">
+    <h1>RINGDOWN</h1>
+    <p>Your quartz plate is a gravitational-wave antenna. Black-hole inspirals, bursts and boson clouds pass through it, and each one tugs the crystal in a quadrupole pattern. Match the crystal to each wave before it arrives so it rings as hard as possible. The waves keep coming faster.</p>
+    <p class="keys"><kbd>◀</kbd><kbd>▶</kbd> turn the arms &nbsp; <kbd>▲</kbd><kbd>▼</kbd> tune lower or higher &nbsp; <kbd>Space</kbd> ring it</p>
+    <div class="legend">
+      <div><i style="background:var(--wave)"></i><span><b>Amber outline</b> is the best crystal for the next wave. Turn and tune until yours fills it, and it locks gold.</span></div>
+      <div><i style="background:var(--quartz)"></i><span><b>Ring early</b> once you're locked. Perfect locks in a row build a combo up to ×8.</span></div>
+      <div><i style="background:var(--noise)"></i><span><b>Noise floor</b> rises every wave and the countdown shrinks. A catch below the floor is lost. Three losses and the run ends.</span></div>
+    </div>
+    <p class="muted">Scoring is calibrated against real SIMP topology optimization of a quartz GW antenna, where an optimized plate reached χ ≈ 0.92 against 0.66 for a plain disk.</p>
+    <label class="check"><input type="checkbox" id="daily"> Daily signal: everyone gets the same waves today</label>
+    <div class="row"><button class="go" id="bStart" style="margin-left:0">Start listening <kbd>Space</kbd></button><span class="muted" id="bestOut"></span></div>
+  </div>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="panel">
+    <h2>Signal lost</h2>
+    <p id="overStats"></p>
+    <img id="shareImg" alt="Your final crystal and run stats">
+    <div class="shareText" id="shareText"></div>
+    <div class="row"><button class="go" id="bAgain" style="margin-left:0">Listen again <kbd>Space</kbd></button><button id="bCopy">Copy result</button><span class="muted" id="copyMsg"></span></div>
+    <p class="muted">Long-press or right-click the card to save it.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ---------- Geometry and the arcade coupling model ----------
+const N = 32, R = N / 2, VF = 0.4;
+const CX = new Float32Array(N * N), CY = new Float32Array(N * N), R2 = new Float32Array(N * N), TH = new Float32Array(N * N);
+const MASK = new Uint8Array(N * N);
+let DISK_CELLS = 0;
+for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+  const k = i * N + j, x = j + 0.5 - R, y = -(i + 0.5 - R);
+  CX[k] = x; CY[k] = y; R2[k] = x * x + y * y; TH[k] = Math.atan2(y, x);
+  if (R2[k] <= R * R) { MASK[k] = 1; DISK_CELLS++; }
+}
+const DISK = new Uint8Array(N * N); for (let k = 0; k < N * N; k++) DISK[k] = R2[k] <= VF * R * R ? 1 : 0;
+const BUDGET = Math.max(Math.round(VF * DISK_CELLS), DISK.reduce((a, b) => a + b, 0));
+let S_DISK = 0, CNT_DISK = 0;
+for (let k = 0; k < N * N; k++) if (DISK[k]) { S_DISK += R2[k]; CNT_DISK++; }
+const RG_DISK = Math.sqrt(S_DISK / CNT_DISK);
+const F_DISK = 5.0; // MHz: the repo's target frequency, assigned to the plain disk
+
+// Largest 4-connected piece (the repo keeps the largest solid component too).
+function largestPiece(g) {
+  const lab = new Int32Array(N * N), out = new Uint8Array(N * N), q = new Int32Array(N * N);
+  let best = 0, bestId = 0, id = 0;
+  for (let s = 0; s < N * N; s++) {
+    if (!g[s] || lab[s]) continue;
+    id++; let h = 0, t = 0, n = 0; q[t++] = s; lab[s] = id;
+    while (h < t) {
+      const k = q[h++]; n++; const i = (k / N) | 0, j = k % N;
+      if (i > 0 && g[k - N] && !lab[k - N]) { lab[k - N] = id; q[t++] = k - N; }
+      if (i < N - 1 && g[k + N] && !lab[k + N]) { lab[k + N] = id; q[t++] = k + N; }
+      if (j > 0 && g[k - 1] && !lab[k - 1]) { lab[k - 1] = id; q[t++] = k - 1; }
+      if (j < N - 1 && g[k + 1] && !lab[k + 1]) { lab[k + 1] = id; q[t++] = k + 1; }
+    }
+    if (n > best) { best = n; bestId = id; }
+  }
+  for (let k = 0; k < N * N; k++) out[k] = lab[k] === bestId && bestId ? 1 : 0;
+  return out;
+}
+// Radial tidal tug of a + wave rotated by psi: strongest along the wave's axes, zero on the diagonals between them.
+function pull(k, psi) { const c = Math.cos(2 * (TH[k] - psi)); return c * c; }
+const lor = (f, f0, bw) => 1 / (1 + ((f - f0) / bw) ** 2);
+
+function evaluate(g, w) {
+  const piece = largestPiece(g);
+  let s = 0, sp = 0, n = 0;
+  for (let k = 0; k < N * N; k++) if (piece[k]) { s += R2[k]; sp += R2[k] * pull(k, w.psi); n++; }
+  if (!n) return { piece, chi: 0, chiD: 0, f: 0, match: 0, lever: 0, caught: 0, n };
+  const chi = w.type === "cw" ? 0.5 : sp / s;      // circular polarization averages every shape to 1/2
+  const chiD = Math.min(1, 1.31 * chi);              // rescaled so the plain disk reads 0.66, like the real solver
+  const f = F_DISK * RG_DISK / Math.sqrt(s / n);     // f ~ 1/size, exact scaling for a fixed shape
+  let match;
+  if (w.type === "chirp") { match = 0; for (let i = 0; i < 24; i++) match += lor(f, w.f0 - w.span / 2 + w.span * i / 23, 0.45); match /= 24; match = Math.min(1, match * 1.6); }
+  else match = lor(f, w.f0, w.bw);
+  const lever = Math.sqrt(s / S_DISK);               // energy grows with the mass quadrupole lever arm
+  return { piece, chi, chiD, f, match, lever, caught: chiD * lever * match, n };
+}
+
+// ---------- Arrow-key crystal ----------
+// The plate is a 4-armed quadrupole antenna set by two numbers:
+//   angle (left/right): which way the arms point, in 15 degree steps (6 distinct, since the crystal has 4-fold symmetry)
+//   level (up/down):    a rung on the tuning ladder, 0.2 MHz apart. Down = short compact arms, higher pitch; up = long arms, lower pitch.
+// Shapes are built from 4-cell rotation orbits, so every crystal is exactly 4-fold symmetric, and cells tied on
+// priority are taken together, so the + and x crystals are mirror symmetric too.
+const ANGLES = 6, ANGLE_STEP = Math.PI / 12;
+const cellAt = (x, y) => (R - 0.5 - y) * N + (x + R - 0.5);
+const ORBITS = [];
+for (let k = 0; k < N * N; k++) if (MASK[k] && CX[k] > 0 && CY[k] > 0) {
+  const x = CX[k], y = CY[k]; ORBITS.push([cellAt(x, y), cellAt(-y, x), cellAt(-x, -y), cellAt(y, -x)]);
+}
+function shapeFor(angle, spread, fill) {
+  const K4 = Math.round(BUDGET * fill / 4), alpha = 3 * spread / (1 - spread + 0.03);
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const pr = ORBITS.map((o, ix) => {
+    const x = CX[o[0]], y = CY[o[0]], u = x * ca + y * sa, v = -x * sa + y * ca, perp = Math.min(Math.abs(u), Math.abs(v));
+    return [R2[o[0]] + alpha * perp * perp, ix];
+  }).sort((a, b) => a[0] - b[0]);
+  const g = new Uint8Array(N * N);
+  for (let i = 0, n = 0; i < pr.length; i++, n++) {
+    if (n >= K4 && pr[i][0] - pr[i - 1][0] > 1e-4) break;
+    for (const k of ORBITS[pr[i][1]]) g[k] = 1;
+  }
+  return g;
+}
+const LADDER = (() => {
+  // For each rung keep the shape that couples best (chi x lever) among those within 0.05 MHz of it.
+  const cand = [], probe = { psi: 0, type: "burst", f0: 5, bw: 1 };
+  for (let fill = 1; fill >= 0.5; fill -= 0.025) for (let s = 0; s <= 0.98; s += 0.02) {
+    const e = evaluate(shapeFor(0, s, fill), probe); cand.push({ spread: s, fill, f: e.f, q: e.chiD * e.lever });
+  }
+  const out = [];
+  for (let f = 3.8; f <= 6.2 + 1e-9; f += 0.2) {
+    let best = null;
+    for (const c of cand) if (Math.abs(c.f - f) < 0.05 && (!best || c.q > best.q)) best = c;
+    if (!best) { best = cand[0]; for (const c of cand) if (Math.abs(c.f - f) < Math.abs(best.f - f)) best = c; }
+    out.push({ spread: best.spread, fill: best.fill, f: Math.round(f * 10) / 10 });
+  }
+  return out;
+})();
+const SHAPES = Array.from({ length: ANGLES }, (_, a) => LADDER.map(L => shapeFor(a * ANGLE_STEP, L.spread, L.fill)));
+const START_LEVEL = LADDER.findIndex(L => L.f >= 5.0);
+
+// The best crystal the arrows can make for a wave. Every wave is built so this exists.
+function idealFor(w) {
+  let best = { a: 0, l: 0, caught: -1 };
+  for (let a = 0; a < ANGLES; a++) for (let l = 0; l < LADDER.length; l++) {
+    const c = evaluate(SHAPES[a][l], w).caught;
+    if (c > best.caught + 1e-9) best = { a, l, caught: c };
+  }
+  return best;
+}
+// Share of the ideal catch you need to rise above the noise floor. A perfect lock always clears it.
+const passFrac = n => Math.min(0.97, 0.6 + 0.03 * (n - 1));
+
+// ---------- Waves ----------
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeWave(n, rnd) {
+  const deg = Math.PI / 180, pick = a => a[Math.floor(rnd() * a.length)];
+  const rung = (lo, hi) => pick(LADDER.filter(L => L.f >= lo - 1e-6 && L.f <= hi + 1e-6)).f;
+  let type, psi, f0;
+  if (n === 1) { type = "burst"; psi = 0; f0 = 5.2; }
+  else if (n === 2) { type = "burst"; psi = 45 * deg; f0 = 4.6; }
+  else if (n === 3) { type = "chirp"; psi = 0; f0 = 4.2; }
+  else if (n === 4) { type = "cw"; psi = 0; f0 = rung(4.0, 5.6); }
+  else {
+    const r = rnd(); type = r < 0.45 ? "burst" : r < 0.8 ? "chirp" : "cw";
+    psi = (n < 7 ? pick([0, 45]) : pick([0, 15, 30, 45, 60, 75])) * deg;
+    f0 = type === "chirp" ? rung(3.8, 5.0) : rung(3.8, 6.0);
+  }
+  const golden = n >= 5 && type === "chirp" && rnd() < 0.25;
+  const kpc = (0.3 + rnd() * 4).toFixed(1);
+  const w = { n, type, psi, f0, golden, kpc, mult: golden ? 5 : type === "cw" ? 1.6 : type === "chirp" ? 1.3 : 1,
+    bw: type === "cw" ? 0.3 : f0 / 9, span: 2.0,
+    build: n === 1 ? 6 : n === 2 ? 4.5 : Math.max(1.4, 3.6 - 0.1 * (n - 3)),
+    hitDur: type === "burst" ? 0.9 : 1.3 };
+  w.ideal = idealFor(w); w.floor = w.ideal.caught * passFrac(n);
+  const pol = psi === 0 ? "+" : Math.abs(psi - Math.PI / 4) < 1e-6 ? "×" : `${Math.round(psi / deg)}°`;
+  if (type === "burst") { w.name = "Sine-Gaussian burst"; w.sub = `${f0.toFixed(1)} MHz · Q = 9 · ${pol} polarization · ${kpc} kpc`; }
+  if (type === "chirp") { w.name = golden ? "Golden merger ×5" : "PBH inspiral chirp"; w.sub = `${(f0 - 1).toFixed(1)}→${(f0 + 1).toFixed(1)} MHz · 2×10⁻⁴ M☉ pair · ${pol} · ${kpc} kpc`; }
+  if (type === "cw") { w.name = "Boson-cloud hum"; w.sub = `${f0.toFixed(1)} MHz · circular, narrow band · ${kpc} kpc`; }
+  return w;
+}
+if (typeof module !== "undefined") module.exports = { ANGLES, LADDER, SHAPES, START_LEVEL, idealFor, passFrac, N, BUDGET, evaluate, makeWave, mulberry32, largestPiece, MASK, CX, CY, R2 };
+</script>
+
+<script>
+"use strict";
+if (typeof document !== "undefined") (function () {
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = { quartz: css("--quartz"), dim: css("--quartz-dim"), wave: css("--wave"), gold: css("--gold"), noise: css("--noise"), line: css("--line"), text: css("--text"), muted: css("--muted"), space: css("--space") };
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const RESULT_T = 0.6;
+
+// ---------- State ----------
+let angleIdx = 0, level = START_LEVEL, grid = SHAPES[0][START_LEVEL];
+let wave, evalNow, rnd, state = "title", runDaily = false, overAt = 0;
+let waveNo = 1, score = 0, strikes = 0, phaseT = 0, hitT = 0, ringAmp = 0, ringPhase = 0;
+let streak = 0, combo = 1, bestCombo = 1, locks = 0, bestCatch = 0, locked = false, muted = false;
+let spin = 0, pulse = 0, flash = 0, shake = 0; // eased visual offsets
+const history = [];
+
+// ---------- Canvas ----------
+const stage = $("stage"), sctx = stage.getContext("2d"), sky = $("sky"), kctx = sky.getContext("2d");
+let dpr = 1, cell = 9;
+const off = document.createElement("canvas"), octx = off.getContext("2d");
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const wrap = $("stageWrap"), s = Math.max(160, Math.min(wrap.clientWidth, wrap.clientHeight));
+  stage.style.width = stage.style.height = s + "px"; stage.width = stage.height = Math.round(s * dpr);
+  off.width = off.height = stage.width; cell = (s * 0.84) / N;
+  sky.width = innerWidth * dpr; sky.height = innerHeight * dpr;
+}
+const stars = (() => { const r = mulberry32(7); return Array.from({ length: 160 }, () => ({ x: r(), y: r(), s: r() * 1.4 + 0.3, p: r() * 6.28, z: 0.3 + r() })); })();
+new ResizeObserver(resize).observe($("stageWrap"));
+addEventListener("resize", resize);
+
+// ---------- Audio ----------
+let ac = null, master = null;
+function audio() {
+  if (ac || muted) return ac;
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.5; master.connect(ac.destination); } catch (e) { ac = null; }
+  return ac;
+}
+const mhzToHz = f => 90 * f; // 5 MHz -> 450 Hz
+function tone(type, f0, f1, dur, gain, delay = 0) {
+  if (!audio() || muted) return;
+  const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.03, dur / 4)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+}
+
+// ---------- Controls: arrows and space ----------
+function reshape() { grid = SHAPES[angleIdx][level]; }
+function turn(d) {
+  if (state !== "build") return;
+  angleIdx = (angleIdx + d + ANGLES) % ANGLES; reshape();
+  spin += d * Math.PI / 12; tone("square", 900 + angleIdx * 60, 900 + angleIdx * 60, 0.04, 0.03); refresh();
+}
+function tune(d) {
+  if (state !== "build") return;
+  const nl = Math.max(0, Math.min(LADDER.length - 1, level + d)); if (nl === level) { pulse = -0.04; return; }
+  level = nl; reshape(); pulse = d * 0.06; tone("triangle", mhzToHz(LADDER[level].f) * 2, mhzToHz(LADDER[level].f) * 2, 0.06, 0.06); refresh();
+}
+function space() {
+  if (state === "build") beginHit();
+  else if (state === "title" || (state === "over" && performance.now() - overAt > 700)) start();
+}
+const KEYS = { ArrowLeft: () => turn(1), ArrowRight: () => turn(-1), ArrowUp: () => tune(-1), ArrowDown: () => tune(1) };
+addEventListener("keydown", e => {
+  if (KEYS[e.key]) { e.preventDefault(); audio(); KEYS[e.key](); }
+  else if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (!e.repeat) space(); }
+});
+for (const [id, key] of [["kLeft", "ArrowLeft"], ["kRight", "ArrowRight"], ["kUp", "ArrowUp"], ["kDown", "ArrowDown"]]) {
+  const el = $(id); let rep = null, t0 = null;
+  const stop = () => { clearTimeout(t0); clearInterval(rep); rep = t0 = null; };
+  el.addEventListener("pointerdown", ev => { ev.preventDefault(); audio(); KEYS[key](); stop(); t0 = setTimeout(() => { rep = setInterval(KEYS[key], 80); }, 260); });
+  for (const t of ["pointerup", "pointerleave", "pointercancel"]) el.addEventListener(t, stop);
+}
+$("bGo").onclick = () => space();
+$("bMute").onclick = () => { muted = !muted; $("bMute").setAttribute("aria-pressed", muted); $("bMute").textContent = muted ? "♪̸" : "♪"; };
+
+// ---------- HUD ----------
+const fToX = f => Math.max(0, Math.min(100, (f - 2) / 6 * 100));
+const ghostGrid = () => SHAPES[wave.type === "cw" ? angleIdx : wave.ideal.a][wave.ideal.l];
+function refresh() {
+  evalNow = evaluate(grid, wave);
+  const was = locked; locked = evalNow.caught >= wave.ideal.caught * 0.985;
+  if (locked && !was && state === "build") { flash = 1; tone("sine", 1320, 1320, 0.12, 0.12); tone("sine", 1760, 1760, 0.16, 0.1, 0.06); }
+  const maxC = 1.4;
+  const lo = wave.type === "chirp" ? wave.f0 - wave.span / 2 : wave.f0 - wave.bw, hi = wave.type === "chirp" ? wave.f0 + wave.span / 2 : wave.f0 + wave.bw;
+  $("band").style.left = fToX(lo) + "%"; $("band").style.width = (fToX(hi) - fToX(lo)) + "%";
+  $("needle").style.left = fToX(evalNow.f) + "%";
+  $("fOut").textContent = evalNow.f.toFixed(1) + " MHz";
+  $("catchFill").style.width = Math.min(100, evalNow.caught / maxC * 100) + "%";
+  $("floorLine").style.left = Math.min(100, wave.floor / maxC * 100) + "%";
+  $("catchOut").textContent = locked ? "LOCKED" : evalNow.caught.toFixed(2);
+  $("catchOut").style.color = locked ? C.gold : evalNow.caught < wave.floor ? C.noise : C.text;
+  $("aimFill").style.width = (wave.type === "cw" ? 50 : evalNow.chiD * 100) + "%";
+  const deg = angleIdx * 15;
+  $("aimOut").textContent = `${deg === 0 ? "+" : deg === 45 ? "×" : deg + "°"}  χ ${evalNow.chiD.toFixed(2)}`;
+}
+function showWaveCard() {
+  $("waveName").textContent = wave.name; $("waveName").className = "card-title" + (wave.golden ? " gold" : "");
+  $("waveSub").textContent = wave.sub; $("waveNo").textContent = waveNo;
+  const g = $("glyph").getContext("2d"); g.clearRect(0, 0, 80, 80);
+  g.strokeStyle = C.line; g.lineWidth = 2; g.beginPath(); g.arc(40, 40, 34, 0, 7); g.stroke();
+  g.strokeStyle = wave.golden ? C.gold : C.wave; g.lineWidth = 5; g.lineCap = "round";
+  for (const a of wave.type === "cw" ? [0, Math.PI / 4] : [wave.psi]) for (const b of [a, a + Math.PI / 2]) {
+    g.globalAlpha = wave.type === "cw" ? 0.6 : 1; g.beginPath();
+    g.moveTo(40 - 26 * Math.cos(b), 40 + 26 * Math.sin(b)); g.lineTo(40 + 26 * Math.cos(b), 40 - 26 * Math.sin(b)); g.stroke();
+  }
+  g.globalAlpha = 1;
+}
+function renderHud() {
+  $("score").textContent = score.toLocaleString(); $("combo").textContent = "×" + combo;
+  $("combo").parentElement.classList.toggle("hot", combo > 1);
+  [...$("strikes").children].forEach((el, i) => el.classList.toggle("on", i < strikes));
+}
+function toast(text, sub, color) { const t = $("toast"); t.innerHTML = `${text}${sub ? `<small>${sub}</small>` : ""}`; t.style.color = color; t.style.opacity = 1; }
+const hideToast = () => { $("toast").style.opacity = 0; };
+const TIPS = {
+  1: "◀ ▶ turn and ▲ ▼ tune until your crystal fills the amber outline. Then Space.",
+  2: "Ring the moment it locks: early rings score more and build your combo.",
+  3: "A chirp sweeps up in frequency, so it wants long arms.",
+  4: "A circular hum ignores aim. Only the tuning has to match.",
+};
+
+// ---------- Flow ----------
+function start() {
+  const daily = $("daily").checked, d = new Date();
+  const seed = daily ? Number(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`) : (Math.random() * 2 ** 31) | 0;
+  rnd = mulberry32(seed); runDaily = daily;
+  angleIdx = 0; level = START_LEVEL; reshape();
+  waveNo = 1; score = 0; strikes = 0; streak = 0; combo = 1; bestCombo = 1; locks = 0; bestCatch = 0; history.length = 0;
+  $("title").hidden = true; $("over").hidden = true; audio(); renderHud();
+  nextWave(true);
+}
+function nextWave(first) {
+  if (!first) waveNo++;
+  wave = makeWave(waveNo, rnd); state = "build"; phaseT = wave.build; hideToast(); locked = false;
+  $("tip").textContent = TIPS[waveNo] || ""; $("bGo").disabled = false;
+  showWaveCard(); refresh();
+  tone("sine", mhzToHz(wave.f0) * 0.5, mhzToHz(wave.f0) * 0.5, 0.25, 0.08);
+}
+function beginHit() {
+  wave._left = Math.max(0, phaseT) / wave.build;
+  evalNow = evaluate(grid, wave); state = "hit"; hitT = 0; ringPhase = 0;
+  $("bGo").disabled = true; $("tip").textContent = "";
+  const f0 = mhzToHz(wave.type === "chirp" ? wave.f0 - 1 : wave.f0), f1 = mhzToHz(wave.type === "chirp" ? wave.f0 + 1.4 : wave.f0);
+  tone(wave.type === "cw" ? "sine" : "sawtooth", f0 * 0.5, f1 * 0.5, wave.hitDur, 0.06);
+  tone("sine", f0, f1, wave.hitDur, 0.1);
+}
+function endHit() {
+  const c = evalNow.caught, lost = c < wave.floor, perfect = !lost && locked;
+  bestCatch = Math.max(bestCatch, c);
+  if (perfect) { streak++; locks++; } else streak = 0;
+  combo = lost ? 1 : Math.min(8, 1 + streak); bestCombo = Math.max(bestCombo, combo);
+  const speed = lost ? 0 : Math.round(300 * wave._left);
+  const pts = lost ? 0 : Math.round(c * 500 * wave.mult * combo) + speed;
+  score += pts; history.push({ c, lost, perfect, golden: wave.golden });
+  ringAmp = lost ? c * 0.4 : Math.min(1.4, c); state = "result"; phaseT = RESULT_T; shake = lost ? 0.3 : Math.min(1, c);
+  if (lost) { strikes++; toast("LOST IN NOISE", `caught ${c.toFixed(2)}, needed ${wave.floor.toFixed(2)}`, C.noise); tone("triangle", 90, 50, 0.5, 0.25); }
+  else {
+    const word = perfect ? (combo > 2 ? `PERFECT ×${combo}` : "PERFECT") : "CAUGHT";
+    toast(word, `+${pts.toLocaleString()}`, wave.golden ? C.gold : perfect ? C.gold : C.quartz);
+    const f = mhzToHz(evalNow.f) * 2;
+    tone("triangle", f, f, 0.9, Math.min(0.3, 0.08 + c * 0.18));
+    if (perfect) tone("sine", f * 1.5, f * 1.5, 0.7, 0.08, 0.04);
+  }
+  renderHud();
+}
+
+// ---------- Drawing ----------
+function drawSky(t, dt) {
+  const w = sky.width, h = sky.height; kctx.fillStyle = C.space; kctx.fillRect(0, 0, w, h);
+  const warp = state === "hit" ? 1 : 0.15 + Math.min(0.6, waveNo * 0.03); // the sky streams faster as the run speeds up
+  for (const s of stars) {
+    s.y = (s.y + dt * warp * 0.05 * s.z) % 1;
+    kctx.globalAlpha = 0.35 + 0.35 * Math.sin(t * 0.0013 + s.p);
+    kctx.fillStyle = C.text; kctx.fillRect(s.x * w, s.y * h, s.s * dpr, s.s * dpr * (1 + warp * 3 * s.z));
+  }
+  kctx.globalAlpha = 1;
+  if (state === "hit" && !reduceMotion) {
+    const col = wave.golden ? C.gold : C.wave, k = hitT / wave.hitDur, D = Math.hypot(w, h) * 0.6;
+    kctx.strokeStyle = col; kctx.lineWidth = 2 * dpr;
+    for (let i = 0; i < 6; i++) {
+      const rr = ((k * 2 + i / 6) % 1) * D;
+      kctx.globalAlpha = 0.3 * (1 - rr / D);
+      kctx.beginPath(); kctx.ellipse(w / 2, h / 2, rr, rr * 0.9, 0, 0, 7); kctx.stroke();
+    }
+    kctx.globalAlpha = 1;
+  }
+}
+function waveDrive() {
+  const k = hitT / wave.hitDur;
+  if (wave.type === "burst") return { env: Math.exp(-(((k - 0.45) / 0.22) ** 2)), freq: 9, psi: wave.psi };
+  if (wave.type === "chirp") return { env: k < 0.85 ? 0.3 + 0.7 * k / 0.85 : Math.max(0, 1 - (k - 0.85) / 0.15), freq: 4 + 16 * k * k, psi: wave.psi };
+  return { env: Math.min(1, k * 5, (1 - k) * 5), freq: 8, psi: wave.psi + hitT * 4 };
+}
+function drawCells(ctx, g, sn, c2, s2, c, mid, color, alpha) {
+  ctx.fillStyle = color;
+  for (let k = 0; k < N * N; k++) {
+    if (!g[k]) continue;
+    const x = CX[k], y = CY[k], ux = sn * (c2 * x + s2 * y), uy = sn * (s2 * x - c2 * y);
+    ctx.globalAlpha = alpha * (0.8 + 0.2 * ((k * 7919) % 13) / 13);
+    ctx.fillRect(mid + (x + ux) * c - c / 2 + 0.5, mid - (y + uy) * c - c / 2 + 0.5, c - 0.5, c - 0.5);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawStage(dt) {
+  const s = stage.width, c = cell * dpr, mid = s / 2;
+  const ease = 1 - Math.exp(-dt * 22);
+  spin -= spin * ease; pulse -= pulse * ease; flash *= Math.exp(-dt * 5); shake *= Math.exp(-dt * 6);
+  sctx.setTransform(1, 0, 0, 1, 0, 0); sctx.clearRect(0, 0, s, s);
+  if (shake > 0.01 && !reduceMotion) sctx.translate((Math.random() - 0.5) * shake * 10 * dpr, (Math.random() - 0.5) * shake * 10 * dpr);
+  sctx.strokeStyle = C.line; sctx.lineWidth = 1.5 * dpr; sctx.setLineDash([4 * dpr, 5 * dpr]);
+  sctx.beginPath(); sctx.arc(mid, mid, R * c, 0, 7); sctx.stroke(); sctx.setLineDash([]);
+  const col = wave && wave.golden ? C.gold : C.wave;
+
+  if (wave && state === "build") {
+    // tidal pull on empty cells
+    const cw = wave.type === "cw";
+    sctx.fillStyle = col;
+    for (let k = 0; k < N * N; k++) {
+      if (!MASK[k] || grid[k]) continue;
+      const p = cw ? 0.5 : pull(k, wave.psi), a = p * p * (R2[k] / (R * R)) * 0.22;
+      if (a < 0.01) continue;
+      sctx.globalAlpha = a; sctx.fillRect(mid + CX[k] * c - c / 2 + 1, mid - CY[k] * c - c / 2 + 1, c - 2, c - 2);
+    }
+    // ghost of the ideal crystal: outline its cells
+    const gg = ghostGrid(); sctx.strokeStyle = col; sctx.lineWidth = Math.max(1, 1.4 * dpr);
+    sctx.globalAlpha = 0.55 + 0.25 * Math.sin(performance.now() * 0.012);
+    sctx.beginPath();
+    for (let k = 0; k < N * N; k++) {
+      if (!gg[k]) continue;
+      const x = mid + CX[k] * c - c / 2, y = mid - CY[k] * c - c / 2, i = (k / N) | 0, j = k % N;
+      if (i === 0 || !gg[k - N]) { sctx.moveTo(x, y); sctx.lineTo(x + c, y); }
+      if (i === N - 1 || !gg[k + N]) { sctx.moveTo(x, y + c); sctx.lineTo(x + c, y + c); }
+      if (j === 0 || !gg[k - 1]) { sctx.moveTo(x, y); sctx.lineTo(x, y + c); }
+      if (j === N - 1 || !gg[k + 1]) { sctx.moveTo(x + c, y); sctx.lineTo(x + c, y + c); }
+    }
+    sctx.stroke(); sctx.globalAlpha = 1;
+    // incoming wavefront
+    const frac = Math.max(0, phaseT / wave.build), rr = R * c * (1.02 + frac * 0.9);
+    sctx.strokeStyle = frac < 0.3 ? C.noise : col; sctx.lineWidth = 3 * dpr; sctx.globalAlpha = 0.4 + 0.5 * (1 - frac);
+    sctx.beginPath(); sctx.arc(mid, mid, rr, 0, 7); sctx.stroke(); sctx.globalAlpha = 1;
+  }
+  if (wave) { // tidal arrows around the rim
+    const psi = wave.type === "cw" && state === "hit" ? waveDrive().psi : wave.psi;
+    sctx.strokeStyle = col; sctx.fillStyle = col; sctx.lineWidth = 2 * dpr;
+    for (let a = 0; a < 16; a++) {
+      const th = a * Math.PI / 8, p = wave.type === "cw" && state !== "hit" ? 0.5 : Math.cos(2 * (th - psi));
+      const len = p * c * 1.6 * (state === "hit" ? Math.sin(ringPhase) : 1);
+      if (Math.abs(len) < c * 0.25) continue;
+      const r0 = R * c + c * 0.9, x1 = mid + (r0 + len) * Math.cos(th), y1 = mid - (r0 + len) * Math.sin(th);
+      sctx.globalAlpha = 0.85; sctx.beginPath(); sctx.moveTo(mid + r0 * Math.cos(th), mid - r0 * Math.sin(th)); sctx.lineTo(x1, y1); sctx.stroke();
+      const hx = Math.cos(th) * Math.sign(len), hy = -Math.sin(th) * Math.sign(len), h = c * 0.45;
+      sctx.beginPath(); sctx.moveTo(x1 + hx * h * 0.6, y1 + hy * h * 0.6); sctx.lineTo(x1 - hy * h * 0.5, y1 + hx * h * 0.5); sctx.lineTo(x1 + hy * h * 0.5, y1 - hx * h * 0.5); sctx.fill();
+    }
+    sctx.globalAlpha = 1;
+  }
+
+  // crystal, ringing with quadrupole deformation u = a (e·x) sin(phase)
+  let amp = 0, psi = wave ? wave.psi : 0;
+  if (state === "hit") { const d = waveDrive(); ringPhase += dt * d.freq * 6.283; amp = d.env * Math.min(1.4, evalNow.caught); psi = d.psi; }
+  else if (state === "result" || state === "title") { ringPhase += dt * 11 * 6.283; ringAmp *= Math.exp(-dt * 3); amp = ringAmp; }
+  if (reduceMotion) amp *= 0.3;
+  const sn = Math.sin(ringPhase) * amp * 0.11;
+  octx.clearRect(0, 0, s, s);
+  const color = locked && state !== "title" ? C.gold : C.quartz;
+  drawCells(octx, grid, sn, Math.cos(2 * psi), Math.sin(2 * psi), c, mid, color, 1);
+  sctx.save();
+  sctx.translate(mid, mid); sctx.rotate(spin); sctx.scale(1 + pulse, 1 + pulse); sctx.translate(-mid, -mid);
+  const glow = (state === "hit" || state === "result" ? 6 + 26 * amp : 5) + flash * 24;
+  sctx.globalAlpha = 0.55; sctx.shadowColor = color; sctx.shadowBlur = glow * dpr; sctx.drawImage(off, 0, 0);
+  sctx.shadowBlur = 0; sctx.globalAlpha = 1; sctx.drawImage(off, 0, 0);
+  sctx.restore();
+}
+
+let prev = performance.now();
+function frame(t) {
+  const dt = Math.min(0.05, (t - prev) / 1000); prev = t;
+  if (state === "build") {
+    phaseT -= dt; $("timer").textContent = Math.max(0, phaseT).toFixed(1);
+    $("timer").style.color = phaseT < wave.build * 0.3 ? C.noise : C.text;
+    if (phaseT <= 0) beginHit();
+  } else if (state === "hit") {
+    hitT += dt; if (hitT >= wave.hitDur) endHit();
+  } else if (state === "result") {
+    phaseT -= dt; if (phaseT <= 0) { if (strikes >= 3) gameOver(); else nextWave(false); }
+  }
+  drawSky(t, dt);
+  if (wave) drawStage(dt);
+  requestAnimationFrame(frame);
+}
+
+// ---------- Game over and share card ----------
+function gameOver() {
+  state = "over"; overAt = performance.now(); hideToast();
+  const best = Number(store.get("ringdown-best") || 0), isBest = score > best;
+  if (isBest) store.set("ringdown-best", String(score));
+  const caught = history.filter(h => !h.lost).length;
+  $("overStats").innerHTML = `You caught <b>${caught}</b> of ${history.length} waves, <b>${locks}</b> of them perfect, for <b>${score.toLocaleString()}</b> points. Best combo <b>×${bestCombo}</b>.${isBest ? " New personal best." : best ? ` Your best is ${best.toLocaleString()}.` : ""}`;
+  const row = history.map(h => h.lost ? "⬛" : h.golden ? "🟨" : h.perfect ? "🟦" : "🔷").join("");
+  const d = new Date().toISOString().slice(0, 10);
+  $("shareText").textContent = `RINGDOWN${runDaily ? ` · daily ${d}` : ""}\n${caught}/${history.length} waves · ${locks} perfect · ×${bestCombo} combo · ${score.toLocaleString()} pts\n${row}`;
+  $("shareImg").src = shareCard(caught);
+  $("over").hidden = false; $("copyMsg").textContent = "";
+}
+function shareCard(caught) {
+  const W = 900, H = 470, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const x = cv.getContext("2d");
+  x.fillStyle = C.space; x.fillRect(0, 0, W, H);
+  const r = mulberry32(3); x.fillStyle = C.text; for (let i = 0; i < 140; i++) { x.globalAlpha = r() * 0.5; x.fillRect(r() * W, r() * H, 1.5, 1.5); } x.globalAlpha = 1;
+  // the run's final crystal
+  const gw = 360, gx = 40, gy = 70, c = gw / N;
+  x.strokeStyle = C.line; x.lineWidth = 1.5; x.setLineDash([3, 4]); x.beginPath(); x.arc(gx + gw / 2, gy + gw / 2, gw / 2, 0, 7); x.stroke(); x.setLineDash([]);
+  x.save(); x.shadowColor = C.quartz; x.shadowBlur = 14; x.fillStyle = C.quartz;
+  for (let k = 0; k < N * N; k++) if (grid[k]) x.fillRect(gx + (k % N) * c, gy + ((k / N) | 0) * c, c - 0.6, c - 0.6);
+  x.restore();
+  const tx = 450;
+  x.fillStyle = C.quartz; x.font = `700 52px ${css("--display")}`; x.fillText("RINGDOWN", tx, 120);
+  const lines = [[`${score.toLocaleString()}`, "points"], [`${caught}/${history.length}`, "waves caught"], [`${locks}`, "perfect locks"], [`×${bestCombo}`, "best combo"]];
+  lines.forEach(([v, l], i) => {
+    x.fillStyle = C.text; x.font = `700 34px ${css("--display")}`; x.fillText(v, tx, 185 + i * 56);
+    x.fillStyle = C.muted; x.font = `400 16px ${css("--mono")}`; x.fillText(l, tx + 190, 185 + i * 56);
+  });
+  history.slice(-28).forEach((h, i) => {
+    x.fillStyle = h.lost ? C.line : h.golden ? C.gold : h.perfect ? C.quartz : C.dim;
+    x.fillRect(tx + i * 15, 420, 11, 11);
+  });
+  return cv.toDataURL("image/png");
+}
+$("bCopy").onclick = () => {
+  const text = $("shareText").textContent;
+  const fallback = () => { const sel = getSelection(), rg = document.createRange(); rg.selectNodeContents($("shareText")); sel.removeAllRanges(); sel.addRange(rg); $("copyMsg").textContent = "Selected. Copy it with your keyboard."; };
+  try { navigator.clipboard.writeText(text).then(() => { $("copyMsg").textContent = "Copied"; }, fallback); } catch (e) { fallback(); }
+};
+$("bStart").onclick = start;
+$("bAgain").onclick = start;
+const best0 = Number(store.get("ringdown-best") || 0); if (best0) $("bestOut").textContent = `Best ${best0.toLocaleString()}`;
+
+// Attract mode behind the title: the crystal spinning through shapes and ringing.
+wave = makeWave(1, mulberry32(1)); showWaveCard(); refresh(); state = "title"; renderHud();
+resize(); requestAnimationFrame(frame);
+setInterval(() => {
+  if (state !== "title") return;
+  angleIdx = (angleIdx + 1) % ANGLES; level = (level + 3) % LADDER.length; reshape(); spin += Math.PI / 12; ringAmp = 0.8;
+}, 1400);
+})();
+</script>
