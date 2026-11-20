@@ -6,6 +6,8 @@ I used topology optimization to reshape a 5 MHz quartz plate so it picks up more
 
 **Try it:** [Topology explorer](https://claude.ai/artifact/9CsM5Kr8bC3CCRqEoYJ8ws) · [Arcade game (Ringdown)](https://claude.ai/artifact/4i5DJDKYc74CYgihveRmmA)
 
+![Optimized SC-cut quartz plate at 5 MHz: a compact, bar-like body inside the 0.80 mm design domain, with 1.61x the disk's energy coupling](results_energy/optimized_shape.png)
+
 ## Why I'm doing this
 
 It's hard to tell when you're on an exponential curve. Over the span of one project, something that doubles every year looks like a straight line. Two years ago AI could barely make sense of a forecaster's free-form National Weather Service discussion, and now ActuallyWeather can use Haiku to read them and generate labels for the weather pattern behind each forecast. If I believe AI capability is compounding, the right move is to aim higher than feels reasonable. So I picked the hardest project I could imagine: building a gravitational-wave telescope myself.
