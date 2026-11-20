@@ -1,5 +1,11 @@
 # Shooting higher: a DIY gravitational-wave antenna
 
+## TL;DR
+
+I used topology optimization to reshape a 5 MHz quartz plate so it picks up more energy from a passing gravitational wave. The optimized shape is a compact, bar-like body. It captures 92% of the wave's tidal pattern, versus 66% for a plain disk, and takes about 1.6× more energy per unit volume. Optimizing the plate for raw coupling η instead gives designs that game the metric. Geometry alone can't make this a working detector.
+
+**Try it:** [Topology explorer](https://claude.ai/artifact/9CsM5Kr8bC3CCRqEoYJ8ws) · [Arcade game (Ringdown)](https://claude.ai/artifact/4i5DJDKYc74CYgihveRmmA)
+
 ## Why I'm doing this
 
 It's hard to tell when you're on an exponential curve. Over the span of one project, something that doubles every year looks like a straight line. Two years ago AI could barely make sense of a forecaster's free-form National Weather Service discussion, and now ActuallyWeather can use Haiku to read them and generate labels for the weather pattern behind each forecast. If I believe AI capability is compounding, the right move is to aim higher than feels reasonable. So I picked the hardest project I could imagine: building a gravitational-wave telescope myself.
